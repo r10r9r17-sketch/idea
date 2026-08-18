@@ -27,6 +27,7 @@ Slogan: "Tecnologia que conecta. Confiança que entrega."
 - Testes: 33 casos backend (97% → 100% após fix do rate-limit) + Playwright frontend 100%.
 
 ## Backlog priorizado
+- Upload de imagens do computador no painel (Emergent Object Storage) — concluído em 18/06/2026.
 - P0: credenciais do Mercado Pago (MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET) e catálogo real do usuário.
 - P1: e-mails transacionais (Resend), upload de imagens de produto, autocomplete de CEP (ViaCEP).
 - P2: analytics, recuperação de carrinho, área de trocas/devoluções, exportação de relatórios.

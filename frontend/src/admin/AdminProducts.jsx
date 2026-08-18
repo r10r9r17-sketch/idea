@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api, apiError, brl } from "@/lib/api";
+import { ImageUploader } from "@/admin/ImageUploader";
 
 const BLANK = {
   name: "", category: "acessorios", price: 0, previous_price: "", short_description: "", description: "",
@@ -29,6 +30,7 @@ export default function AdminProducts() {
       stock: Number(editing.stock),
       min_stock: Number(editing.min_stock),
       gallery: editing.gallery?.length ? editing.gallery : editing.image ? [editing.image] : [],
+      image: editing.gallery?.[0] || editing.image || "",
     };
     try {
       if (editing.id) await api.put(`/admin/products/${editing.id}`, payload);
@@ -103,8 +105,13 @@ export default function AdminProducts() {
             <F label="Estoque mínimo" type="number" v={editing.min_stock} on={(v) => setEditing({ ...editing, min_stock: v })} id="pf-minstock" />
             <F label="SKU" v={editing.sku} on={(v) => setEditing({ ...editing, sku: v })} id="pf-sku" />
             <F label="Marca" v={editing.brand} on={(v) => setEditing({ ...editing, brand: v })} id="pf-brand" />
-            <F label="Imagem (URL)" v={editing.image} on={(v) => setEditing({ ...editing, image: v, gallery: [v] })} id="pf-image" />
             <F label="Garantia" v={editing.warranty} on={(v) => setEditing({ ...editing, warranty: v })} id="pf-warranty" />
+            <div className="sm:col-span-2">
+              <ImageUploader
+                gallery={editing.gallery?.length ? editing.gallery : editing.image ? [editing.image] : []}
+                onChange={(gallery) => setEditing({ ...editing, gallery, image: gallery[0] || "" })}
+              />
+            </div>
             <div>
               <label htmlFor="pf-type" className="text-xs uppercase tracking-wider text-[#8B95A1]">Tipo</label>
               <select id="pf-type" data-testid="pf-type" value={editing.product_type} onChange={(e) => setEditing({ ...editing, product_type: e.target.value })} className="mt-2 w-full h-11 px-3 rounded-lg bg-[#1a1f26] border border-[#2A2F36] text-sm">

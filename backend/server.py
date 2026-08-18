@@ -18,7 +18,8 @@ from typing import Any, Dict, List, Optional
 import bcrypt
 import httpx
 import jwt
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response
+import requests
+from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import PlainTextResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -952,6 +953,100 @@ async def mp_webhook(request: Request):
     return {"received": True}
 
 
+# ----------------------------- uploads (object storage) -----------------------------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+APP_NAME = "brazatech"
+ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+storage_key = None
+
+
+def init_storage(force: bool = False):
+    global storage_key
+    if storage_key and not force:
+        return storage_key
+    response = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": os.environ.get("EMERGENT_LLM_KEY")}, timeout=30)
+    response.raise_for_status()
+    storage_key = response.json()["storage_key"]
+    return storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> Dict[str, Any]:
+    def send(key: str):
+        return requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data,
+            timeout=120,
+        )
+
+    response = send(init_storage())
+    if response.status_code == 404:
+        response = send(init_storage(force=True))
+    response.raise_for_status()
+    return response.json()
+
+
+def get_object(path: str):
+    def fetch(key: str):
+        return requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+
+    response = fetch(init_storage())
+    if response.status_code == 404:
+        response = fetch(init_storage(force=True))
+    response.raise_for_status()
+    return response.content, response.headers.get("Content-Type", "application/octet-stream")
+
+
+@api.post("/admin/uploads")
+async def upload_images(files: List[UploadFile] = File(...), admin: Dict[str, Any] = Depends(require_admin)):
+    urls = []
+    for upload in files:
+        content_type = upload.content_type or ""
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail="Formato inválido. Envie imagens JPG, PNG, WEBP ou GIF.")
+        data = await upload.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=400, detail=f"{upload.filename} excede o limite de 8 MB.")
+        path = f"{APP_NAME}/uploads/{admin['id']}/{uuid.uuid4()}.{ALLOWED_IMAGE_TYPES[content_type]}"
+        try:
+            result = put_object(path, data, content_type)
+        except requests.RequestException as exc:
+            logger.error("Falha no upload: %s", exc)
+            raise HTTPException(status_code=502, detail="Falha ao enviar a imagem para o armazenamento.")
+        await db.files.insert_one(
+            {
+                "id": str(uuid.uuid4()),
+                "storage_path": result["path"],
+                "original_filename": upload.filename,
+                "content_type": content_type,
+                "size": result.get("size", len(data)),
+                "is_deleted": False,
+                "uploaded_by": admin["id"],
+                "created_at": now_iso(),
+            }
+        )
+        urls.append(f"{APP_URL}/api/files/{result['path']}")
+    return {"urls": urls}
+
+
+@api.get("/files/{path:path}")
+async def serve_file(path: str):
+    record = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    try:
+        data, content_type = get_object(path)
+    except requests.RequestException:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    return Response(
+        content=data,
+        media_type=record.get("content_type", content_type),
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
 # ----------------------------- seo -----------------------------
 @app.get("/api/sitemap.xml")
 async def sitemap():
@@ -984,6 +1079,12 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    try:
+        init_storage()
+        logger.info("Object storage inicializado")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Falha ao inicializar object storage: %s", exc)
+    await db.files.create_index("storage_path")
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id")
     await db.products.create_index("slug", unique=True)
