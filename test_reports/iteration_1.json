@@ -1,0 +1,41 @@
+{
+  "summary": "Testes de backend (pytest, 33 casos) e testes de frontend (Playwright) executados no ambiente staging da BRAZA TECH. 32/33 testes de backend passam. Fluxo completo de e-commerce funcionando: catálogo (13 categorias, filtros, discount calculado), busca com sugestões, detalhe de produto (related, price_history vazio, reviews aprovadas), carrinho recalculado no servidor (ignora preço do cliente), produto affiliate rejeitado no carrinho, cupom criado pelo admin aplicado no /cart/quote, frete grátis acima de R$299, criação de pedido com número BT... e status pending_payment, admin marca 'paid' e estoque é decrementado, /payments/mercadopago/preference retorna 503 controlado (MP não configurado), webhook rejeita assinatura inválida (401), CRUD admin de produtos/cupons/categorias/banners/depoimentos funcionando, inventory retorna stock_status correto, dashboard com KPIs reais, avaliação criada como 'pending' e aparece após aprovação, /support salva mensagem. Frontend: home, busca, produto, add-to-cart, drawer, checkout completo (chega em /pedido/BT... com status pending_payment), toast 'Pedido registrado. Pagamento MP será liberado quando as credenciais forem configuradas', admin login redireciona pra /admin e todas as 12 telas do painel abrem sem erros de console, cliente comum acessando /admin vê 'Acesso restrito'. Sem erros críticos de console em nenhuma página (o único console.error é o 503 esperado do MP).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/auth/login",
+        "issue": "Brute-force lockout (429 após 5 falhas) NÃO dispara em produção porque o identificador usa request.client.host, que atrás do ingress do Kubernetes alterna entre múltiplos IPs de pod (ex: 10.49.135.194 e 10.49.136.20). Cada IP acumula seu próprio contador e nunca atinge 5. Verificado consultando a coleção login_attempts. Deve-se ler X-Forwarded-For (primeiro IP) ou usar apenas o email como chave.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Corrigir a chave do rate-limit em POST /api/auth/login para usar X-Forwarded-For (ou apenas email) — a proteção contra brute-force está inefetiva atrás do ingress do Kubernetes."
+  ],
+  "critical_code_review_comments": [
+    "server.py (login): request.client.host retorna IP do ingress/pod, não do cliente real. A anti-força-bruta fica dividida entre múltiplos identificadores. Trocar por request.headers.get('x-forwarded-for', '').split(',')[0].strip() ou usar chave apenas por email.",
+    "server.py: create_order não exige autenticação (user é opcional). Isso é intencional para checkout de convidado, mas convém validar que o payload.customer.email é confiável e que orders sem user_id não vazem por /orders/mine.",
+    "seed_data.py: OK — nenhum review/pedido/depoimento fictício é criado. price_is_demo=True marca produtos DEMO corretamente.",
+    "Backend usa DEMO_MODE apenas para pular seed de produtos; mensagem 'Preço demonstrativo' é responsabilidade do frontend."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "97%", "frontend": "100%"},
+  "test_credentials": "Admin admin@brazatech.com.br / BrazaAdmin@2026; Cliente cliente@brazatech.com.br / Cliente@2026",
+  "seed_data_creation": "Nenhum dado de seed adicional criado. Testes usam produtos DEMO já semeados (18 itens) e limpam cupons/produtos/reviews criados após cada teste.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Suite pytest completa em /app/backend/tests/backend_test.py (33 casos, roda em ~5s). Bug ativo: rate-limit de login usa request.client.host e não funciona atrás do ingress k8s. Frontend funcionando fim-a-fim; MP retorna 503 esperado (falta MP_ACCESS_TOKEN). Todos os data-testid citados no request existem no DOM.",
+  "rca of the issue": "Bug de brute-force lockout: identificador `${request.client.host}:${email}` no server.py:249 depende do socket peer. No Kubernetes com múltiplas réplicas de ingress, o starlette recebe conexões de diferentes pods internos (verificado via db.login_attempts: identificadores '10.49.135.194:*' e '10.49.136.20:*' para mesma tentativa curl). Cada réplica acumula até 4-5 tentativas antes de ser roteado pra outro pod, então count nunca chega em 5 no mesmo doc. Mitigação: extrair IP real de X-Forwarded-For (primeiro elemento) ou remover o IP e usar apenas email na chave."
+}

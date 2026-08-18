@@ -1,0 +1,116 @@
+{
+  "project_name": "BRAZA TECH",
+  "theme": "dark",
+  "design_philosophy": "Premium modern tech company aesthetic. Focus on high-end tech, trust, and clear curation. Emphasizes dark mode depth (#0D1117) with striking electric blue/cyan accents. NOT a dropshipping site, NO chaotic neon. Professional, sleek, and highly tactile with a focus on immersive product imagery.",
+  "typography": {
+    "headings": {
+      "family": "Outfit, sans-serif",
+      "weights": ["400", "700"],
+      "usage": "Use tight tracking (tracking-tight) for large text. Never use Inter for headings."
+    },
+    "body": {
+      "family": "Inter, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Use for UI text, product descriptions, specs, and form inputs."
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "body": "text-base text-[#8B95A1]",
+      "labels": "text-xs font-bold uppercase tracking-[0.2em] text-[#8B95A1]"
+    }
+  },
+  "colors": {
+    "background": "#0D1117",
+    "surface": "#2A2F36",
+    "primary": "#0077FF",
+    "secondary": "#00C2FF",
+    "text_main": "#F2F2F2",
+    "text_muted": "#8B95A1",
+    "accent_discount": "#E53E3E",
+    "gradient_brand": "bg-gradient-to-r from-[#0077FF] to-[#00C2FF]",
+    "rules": [
+      "No full-screen gradients. Gradients are only for subtle borders, badges, or primary CTA buttons.",
+      "Always use pure #0D1117 for the main app background to give a deep space tech feel.",
+      "Surface cards should use #2A2F36 with a 1px border of #2A2F36 or slightly lighter #3d444d to establish hierarchy."
+    ]
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "headers": "Crystal Glass: bg-[#0D1117]/80 backdrop-blur-xl border-b border-[#2A2F36] shadow-sm.",
+      "cards": "Flat solid surfaces (bg-[#2A2F36]) with subtle 1px border. On hover, lift with -translate-y-1 and add a subtle glowing shadow of primary color (shadow-[0_4px_20px_rgba(0,119,255,0.15)]).",
+      "bottom_nav": "Crystal Glass for mobile app-like bottom navigation to ensure map/scroll content is visible underneath but text remains readable."
+    },
+    "motion": [
+      "Staggered entrance animations for product grids.",
+      "Hover states on all interactive elements (buttons, product cards).",
+      "Smooth layout transitions for drawer/cart sidebars using framer-motion."
+    ]
+  },
+  "layouts": {
+    "general": "Generous spacing. Use p-6 to p-12 for sections. Mobile-first design.",
+    "hero": "Asymmetric bento grid or large immersive image with max overlay of bg-black/40. The product is the hero.",
+    "product_grid": "Dense but clean grid. 1 col mobile, 2 col tablet, 4 col desktop. Gap-6.",
+    "admin_dashboard": "Strict grid hierarchy. High density. Cards with subtle borders.",
+    "mobile_nav": "Fixed bottom navigation bar from 360px to 768px with badges for cart and favorites."
+  },
+  "components": {
+    "buttons": "Pill-shaped or slightly rounded (rounded-lg). Primary button uses subtle cyan-to-blue gradient or solid #0077FF with hover:brightness-110.",
+    "product_card": "Image dominates (bg-black rounded-t-lg). Includes discount badge (#E53E3E), favorite heart icon top right, category tag, product name, star rating, crossed old price, current price, and 'Comprar' button.",
+    "navigation": "Top header on desktop (Logo, Links, Search, Icons). Bottom nav on mobile.",
+    "drawers": "Use Shadcn Sheet for Cart, showing items, subtotal, shipping calculator, and checkout CTA.",
+    "icons": "Use lucide-react (default) or Phosphor icons for a sharp technical look."
+  },
+  "image_urls": {
+    "hero_product": {
+      "url": "https://images.pexels.com/photos/14541106/pexels-photo-14541106.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Dark aesthetic premium drone for hero section or main banner."
+    },
+    "category_laptops": {
+      "url": "https://images.unsplash.com/photo-1771014846919-3a1cf73aeea1?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Dark tech setup with RGB laptop for category or product card."
+    },
+    "category_wearables": {
+      "url": "https://images.unsplash.com/photo-1758348844319-6ca57f0a8ea0?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "Premium smartwatch close up."
+    },
+    "category_components": {
+      "url": "https://images.unsplash.com/photo-1651340741844-48edcd3fe79c?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "description": "PC motherboard components macro."
+    },
+    "category_peripherals": {
+      "url": "https://images.pexels.com/photos/9020272/pexels-photo-9020272.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Mechanical keyboard exposed switches macro."
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure #F2F2F2 text meets APCA standards against #0D1117 and #2A2F36. For buttons, white text on #0077FF is compliant.",
+    "focus": "focus:ring-2 focus:ring-[#00C2FF] focus:outline-none on all inputs and buttons.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute."
+  },
+  "instructions_to_main_agent": [
+    "Install `lucide-react` if not present. Use for all icons.",
+    "Install `framer-motion` for page transitions and micro-interactions.",
+    "Implement Shadcn UI components (Sheet for cart, Dialog for modals, Tabs for product specs, Dropdown for user menu).",
+    "Configure Tailwind with the provided color hex codes.",
+    "Use standard HTML structure but stylize with pure Tailwind. Build the layout responsively (360px up to 1440px).",
+    "In the admin panel, use Shadcn charts/Recharts for dashboard analytics.",
+    "Build the bottom mobile navigation as a fixed element on screens < 768px. Hide the standard desktop navbar links and use the bottom nav instead."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky navs and overlays.",
+    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like \ud83e\udd16\ud83e\udde0\ud83d\udcad\ud83d\udca1\ud83d\udd2e\ud83c\udfaf etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN. Use the curated image URLs.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use sonner for toasts, located in /app/src/components/ui/sonner.tsx or .jsx."
+  ]
+}
