@@ -36,9 +36,12 @@ export default function Home() {
       .then(([f, o, c, b, t]) => {
         setFeatured(f.data.items);
         setOffers(o.data.items);
-        setCategories(c.data.categories);
+        setCategories(c.data.categories.filter((cat) => cat.product_count > 0));
         setBanner(b.data[0] || null);
         setTestimonials(t.data);
+        if (f.data.items.length === 0) {
+          api.get("/products?sort=newest&limit=8").then((r) => setFeatured(r.data.items));
+        }
       })
       .finally(() => setLoading(false));
   }, []);

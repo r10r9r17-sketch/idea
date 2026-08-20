@@ -6,6 +6,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 import hashlib
 import hmac
+import io
 import logging
 import os
 import re
@@ -22,10 +23,14 @@ import requests
 from fastapi import APIRouter, Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import PlainTextResponse
 from motor.motor_asyncio import AsyncIOMotorClient
+from PIL import Image, ImageOps
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
 import seed_data
+from emails import STATUS_EVENTS, send_order_email
+
+PUBLIC_HIDE = {"_id": 0, "supplier_cost": 0, "supplier_coupon": 0}
 
 logger = logging.getLogger("brazatech")
 logging.basicConfig(level=logging.INFO)
@@ -388,21 +393,21 @@ async def list_products(
     limit = max(1, min(limit, 60))
     skip = (max(page, 1) - 1) * limit
     total = await db.products.count_documents(query)
-    items = await db.products.find(query, {"_id": 0}).sort(sorts.get(sort, sorts["relevance"])).skip(skip).limit(limit).to_list(limit)
+    items = await db.products.find(query, PUBLIC_HIDE).sort(sorts.get(sort, sorts["relevance"])).skip(skip).limit(limit).to_list(limit)
     brands = await db.products.distinct("brand", {"status": "active"})
     return {"items": [compute_discount(i) for i in items], "total": total, "page": page, "limit": limit, "brands": sorted([b for b in brands if b])}
 
 
 @api.get("/products/{slug}")
 async def get_product(slug: str):
-    product = await db.products.find_one({"slug": slug}, {"_id": 0})
+    product = await db.products.find_one({"slug": slug}, PUBLIC_HIDE)
     if not product:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
     compute_discount(product)
     product["price_history"] = await db.price_history.find({"product_id": product["id"]}, {"_id": 0}).sort("date", 1).to_list(50)
     product["reviews"] = await db.reviews.find({"product_id": product["id"], "status": "approved"}, {"_id": 0}).sort("created_at", -1).to_list(50)
     related = await db.products.find(
-        {"category": product["category"], "id": {"$ne": product["id"]}, "status": "active"}, {"_id": 0}
+        {"category": product["category"], "id": {"$ne": product["id"]}, "status": "active"}, PUBLIC_HIDE
     ).limit(4).to_list(4)
     product["related"] = [compute_discount(r) for r in related]
     return product
@@ -442,7 +447,7 @@ async def get_settings():
 async def get_favorites(user: Dict[str, Any] = Depends(get_current_user)):
     favs = await db.favorites.find({"user_id": user["id"]}, {"_id": 0}).to_list(200)
     ids = [f["product_id"] for f in favs]
-    products = await db.products.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    products = await db.products.find({"id": {"$in": ids}}, PUBLIC_HIDE).to_list(200)
     return [compute_discount(p) for p in products]
 
 
@@ -563,6 +568,7 @@ async def create_order(payload: OrderIn, user: Optional[Dict[str, Any]] = Depend
         "updated_at": now_iso(),
     }
     await db.orders.insert_one(dict(order))
+    await send_order_email("order_received", order)
     if quote["coupon"]:
         await db.coupons.update_one({"code": quote["coupon"]}, {"$inc": {"used_count": 1}})
         await db.coupon_usages.insert_one({"code": quote["coupon"], "order_id": order["id"], "created_at": now_iso()})
@@ -745,6 +751,8 @@ async def admin_update_order(order_id: str, payload: Dict[str, Any], _: Dict[str
     if status == "paid" and order["status"] != "paid":
         await decrement_stock(order)
     await db.orders.update_one({"id": order_id}, {"$set": {"status": status, "updated_at": now_iso()}})
+    if status != order["status"] and STATUS_EVENTS.get(status):
+        await send_order_email(STATUS_EVENTS[status], {**order, "status": status})
     return {"ok": True, "status": status}
 
 
@@ -950,6 +958,8 @@ async def mp_webhook(request: Request):
                 {"id": order["id"]},
                 {"$set": {"status": status, "payment_id": str(body_id), "payment_status_detail": payment.get("status_detail"), "updated_at": now_iso()}},
             )
+            if status != order["status"] and STATUS_EVENTS.get(status):
+                await send_order_email(STATUS_EVENTS[status], {**order, "status": status})
     return {"received": True}
 
 
@@ -999,6 +1009,26 @@ def get_object(path: str):
     return response.content, response.headers.get("Content-Type", "application/octet-stream")
 
 
+def crop_to_card(data: bytes) -> tuple[bytes, str]:
+    """Recorta a foto no centro para 4:3 (mesmo formato dos cards) e redimensiona para 1200x900."""
+    with Image.open(io.BytesIO(data)) as image:
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        target = 4 / 3
+        width, height = image.size
+        if width / height > target:
+            new_width = int(height * target)
+            left = (width - new_width) // 2
+            image = image.crop((left, 0, left + new_width, height))
+        else:
+            new_height = int(width / target)
+            top = (height - new_height) // 2
+            image = image.crop((0, top, width, top + new_height))
+        image = image.resize((1200, 900), Image.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="WEBP", quality=88, method=5)
+        return buffer.getvalue(), "image/webp"
+
+
 @api.post("/admin/uploads")
 async def upload_images(files: List[UploadFile] = File(...), admin: Dict[str, Any] = Depends(require_admin)):
     urls = []
@@ -1009,7 +1039,12 @@ async def upload_images(files: List[UploadFile] = File(...), admin: Dict[str, An
         data = await upload.read()
         if len(data) > MAX_UPLOAD_BYTES:
             raise HTTPException(status_code=400, detail=f"{upload.filename} excede o limite de 8 MB.")
-        path = f"{APP_NAME}/uploads/{admin['id']}/{uuid.uuid4()}.{ALLOWED_IMAGE_TYPES[content_type]}"
+        try:
+            data, content_type = crop_to_card(data)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Falha ao processar imagem: %s", exc)
+            raise HTTPException(status_code=400, detail="Não foi possível processar esta imagem.")
+        path = f"{APP_NAME}/uploads/{admin['id']}/{uuid.uuid4()}.webp"
         try:
             result = put_object(path, data, content_type)
         except requests.RequestException as exc:

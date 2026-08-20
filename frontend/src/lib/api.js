@@ -25,6 +25,17 @@ export function apiError(detail, fallback = "Algo deu errado. Tente novamente.")
 export const brl = (value) =>
   Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+export const hasRange = (product) => Boolean(product?.price_max && product.price_max > product.price_min);
+
+export const priceLabel = (product) =>
+  hasRange(product) ? `${brl(product.price_min)} – ${brl(product.price_max)}` : brl(product.price);
+
+export const priceNote = (product) => {
+  if (hasRange(product)) return "Faixa de preço informada pelo fornecedor";
+  if (product?.price_is_demo) return "Preço demonstrativo";
+  return "";
+};
+
 export const WHATSAPP = "https://wa.me/67998737690";
 export const WHATSAPP_DISPLAY = "(67) 99873-7690";
 export const SUPPORT_EMAIL = "therenanlima@gmail.com";

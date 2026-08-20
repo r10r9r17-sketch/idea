@@ -44,7 +44,7 @@ export default function Products({ mode }) {
 
   useEffect(() => {
     load();
-    api.get("/categories").then((r) => setCategories(r.data.categories));
+    api.get("/categories").then((r) => setCategories(r.data.categories.filter((c) => c.product_count > 0)));
     const title = mode === "offers" ? "Ofertas — BRAZA TECH" : category ? `${category} — BRAZA TECH` : "Produtos — BRAZA TECH";
     setSeo({ title, description: "Catálogo de tecnologia com curadoria da Braza Tech.", path: window.location.pathname });
   }, [load, mode, category]);
@@ -108,8 +108,14 @@ export default function Products({ mode }) {
         <div>
           {!loading && data.items.length === 0 ? (
             <div data-testid="empty-results" className="bt-card rounded-xl p-8">
-              <p className="font-display font-semibold">Não encontramos esse produto.</p>
-              <p className="mt-2 text-sm text-[#8B95A1]">Tente outra palavra-chave ou explore categorias relacionadas:</p>
+              <p className="font-display font-semibold">
+                {mode === "offers" ? "Nenhuma oferta ativa no momento." : "Não encontramos esse produto."}
+              </p>
+              <p className="mt-2 text-sm text-[#8B95A1]">
+                {mode === "offers"
+                  ? "As ofertas aparecem aqui automaticamente quando um produto tiver preço anterior maior que o preço atual. Explore o catálogo enquanto isso:"
+                  : "Tente outra palavra-chave ou explore categorias relacionadas:"}
+              </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {categories.slice(0, 6).map((c) => (
                   <button key={c.slug} type="button" onClick={() => { setParams(new URLSearchParams({ category: c.slug })); }} className="h-9 px-4 rounded-full border border-[#2A2F36] text-xs hover:border-[#00C2FF] transition-colors">

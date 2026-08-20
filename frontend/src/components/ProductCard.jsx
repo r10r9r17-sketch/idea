@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Heart, ExternalLink, ShoppingCart, Star } from "lucide-react";
-import { brl } from "@/lib/api";
+import { brl, hasRange, priceLabel, priceNote } from "@/lib/api";
+import { ProductImage } from "@/components/ProductImage";
 import { useStore } from "@/context/StoreContext";
 
 export const ProductCard = ({ product, index = 0 }) => {
@@ -16,12 +17,7 @@ export const ProductCard = ({ product, index = 0 }) => {
     >
       <div className="relative bg-black aspect-[4/3] overflow-hidden">
         <Link to={`/produto/${product.slug}`} aria-label={product.name}>
-          <img
-            src={product.image}
-            alt={product.name}
-            loading="lazy"
-            className="w-full h-full object-cover bt-zoom opacity-90"
-          />
+          <ProductImage src={product.image} alt={product.name} className="w-full h-full object-cover bt-zoom opacity-90" />
         </Link>
         {product.discount_percent > 0 && (
           <span className="absolute top-2 left-2 bg-[#E53E3E] text-white text-xs font-bold px-2 py-1 rounded-md">
@@ -63,8 +59,10 @@ export const ProductCard = ({ product, index = 0 }) => {
           {product.previous_price && product.previous_price > product.price && (
             <p className="text-xs text-[#8B95A1] line-through">{brl(product.previous_price)}</p>
           )}
-          <p className="text-lg sm:text-xl font-bold font-display">{brl(product.price)}</p>
-          {product.price_is_demo && <p className="text-[10px] text-[#8B95A1]">Preço demonstrativo</p>}
+          <p className={`font-bold font-display ${hasRange(product) ? "text-base sm:text-lg" : "text-lg sm:text-xl"}`}>
+            {priceLabel(product)}
+          </p>
+          {priceNote(product) && <p className="text-[10px] text-[#8B95A1]">{priceNote(product)}</p>}
         </div>
         {isAffiliate ? (
           <a

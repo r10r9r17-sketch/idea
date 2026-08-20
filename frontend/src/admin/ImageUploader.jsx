@@ -61,7 +61,8 @@ export const ImageUploader = ({ gallery = [], onChange }) => {
       </div>
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={upload} data-testid="image-file-input" className="hidden" />
       <p className="mt-2 text-xs text-[#8B95A1]">
-        Envie fotos do seu computador (JPG, PNG, WEBP ou GIF, até 8 MB cada). A primeira imagem é a principal do produto.
+        Envie fotos do seu computador (JPG, PNG, WEBP ou GIF, até 8 MB cada). Recortamos automaticamente no formato 4:3
+        dos cards, então todas as fotos ficam alinhadas na vitrine. A primeira imagem é a principal do produto.
       </p>
     </div>
   );

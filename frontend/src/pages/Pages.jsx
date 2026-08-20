@@ -15,7 +15,7 @@ export function Categories() {
   const [cats, setCats] = useState([]);
   useEffect(() => {
     setSeo({ title: "Categorias — BRAZA TECH", description: "Navegue pelas categorias de tecnologia da Braza Tech.", path: "/categorias" });
-    api.get("/categories").then((r) => setCats(r.data.categories));
+    api.get("/categories").then((r) => setCats(r.data.categories.filter((c) => c.product_count > 0)));
   }, []);
   return (
     <Wrap testid="categories-page">

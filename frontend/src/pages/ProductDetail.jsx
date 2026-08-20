@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ExternalLink, Heart, MessageCircle, ShoppingCart, Star } from "lucide-react";
-import { api, apiError, brl, setSeo, waLink } from "@/lib/api";
+import { api, apiError, brl, hasRange, priceLabel, priceNote, setSeo, waLink } from "@/lib/api";
+import { ProductImage } from "@/components/ProductImage";
 import { useStore } from "@/context/StoreContext";
 import { ProductCard } from "@/components/ProductCard";
 
@@ -61,13 +62,13 @@ export default function ProductDetail() {
       <div className="grid lg:grid-cols-2 gap-8">
         <div>
           <div className="bt-card rounded-xl overflow-hidden bg-black aspect-square">
-            <img src={gallery[active]} alt={product.name} className="w-full h-full object-cover" data-testid="product-main-image" />
+            <ProductImage src={gallery[active]} alt={product.name} className="w-full h-full object-cover" />
           </div>
           {gallery.length > 1 && (
             <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
               {gallery.map((img, i) => (
                 <button key={i} type="button" onClick={() => setActive(i)} data-testid={`gallery-thumb-${i}`} aria-label={`Imagem ${i + 1}`} className={`h-16 w-16 shrink-0 rounded-lg overflow-hidden border ${i === active ? "border-[#00C2FF]" : "border-[#2A2F36]"}`}>
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <ProductImage src={img} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -91,8 +92,15 @@ export default function ProductDetail() {
                 <span className="bg-[#E53E3E] text-white text-xs font-bold px-2 py-0.5 rounded">-{product.discount_percent}%</span>
               </div>
             )}
-            <p className="text-3xl font-bold font-display" data-testid="product-price">{brl(product.price)}</p>
-            {product.price_is_demo && <p className="text-xs text-[#8B95A1] mt-1">Preço demonstrativo — sujeito a atualização pelo administrador.</p>}
+            <p className="text-3xl font-bold font-display" data-testid="product-price">{priceLabel(product)}</p>
+            {hasRange(product) && (
+              <p className="mt-1 text-xs text-[#8B95A1]">
+                O fornecedor informa apenas esta faixa de preço. O valor final é confirmado no site do parceiro.
+              </p>
+            )}
+            {!hasRange(product) && product.price_is_demo && (
+              <p className="text-xs text-[#8B95A1] mt-1">{priceNote(product)} — sujeito a atualização pelo administrador.</p>
+            )}
             <p className="mt-2 text-sm" data-testid="product-availability">
               {isAffiliate ? <span className="text-[#00C2FF]">Produto vendido pelo parceiro</span>
                 : product.stock > 0 ? <span className="text-emerald-400">Disponível ({product.stock} em estoque)</span>

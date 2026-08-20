@@ -8,6 +8,8 @@ Nenhuma avaliação, depoimento, pedido, venda ou histórico de preço fictício
 import uuid
 from datetime import datetime, timezone
 
+import catalog_data
+
 NO_INFO = "Informação não informada pelo fornecedor."
 
 CATEGORIES = [
@@ -24,7 +26,7 @@ CATEGORIES = [
     {"slug": "notebooks", "name": "Notebooks", "icon": "Laptop", "order": 11},
     {"slug": "perifericos", "name": "Periféricos", "icon": "Keyboard", "order": 12},
     {"slug": "controle-rc", "name": "Controle RC", "icon": "Radio", "order": 13},
-]
+] + catalog_data.EXTRA_CATEGORIES
 
 IMG = {
     "drone1": "https://images.unsplash.com/photo-1487219116710-23ffcb172b2b?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
@@ -165,10 +167,23 @@ def normalize_product(data):
         "affiliate_network": data.get("affiliate_network") or "",
         "external_product_id": data.get("external_product_id") or "",
         "supplier": data.get("supplier") or "",
+        "supplier_cost": data.get("supplier_cost"),
+        "supplier_coupon": data.get("supplier_coupon") or "",
+        "source": data.get("source") or "manual",
         "keywords": data.get("keywords") or [],
         "created_at": data.get("created_at") or datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def slugify_pt(value: str) -> str:
+    import re
+
+    value = value.lower().strip()
+    for accented, plain in {"á": "a", "à": "a", "ã": "a", "â": "a", "é": "e", "ê": "e", "í": "i",
+                            "ó": "o", "õ": "o", "ô": "o", "ú": "u", "ç": "c"}.items():
+        value = value.replace(accented, plain)
+    return re.sub(r"[^a-z0-9]+", "-", value).strip("-")
 
 
 DEFAULT_SETTINGS = {
@@ -198,27 +213,19 @@ async def seed(db, demo_mode: bool):
     if not existing_settings:
         await db.settings.insert_one(dict(DEFAULT_SETTINGS))
 
-    if not demo_mode:
-        return
-
-    if await db.products.count_documents({}) == 0:
-        for index, raw in enumerate(DEMO_PRODUCTS):
-            product = normalize_product(
-                {
-                    **raw,
-                    "slug": raw["name"].lower().replace(" ", "-").replace("ç", "c").replace("ã", "a").replace("á", "a")
-                    .replace("â", "a").replace("é", "e").replace("ê", "e").replace("í", "i").replace("ó", "o")
-                    .replace("õ", "o").replace("ú", "u").replace(".", "").replace(",", "").replace("(", "").replace(")", ""),
-                    "sku": f"BT-{1000 + index}",
-                    "price_is_demo": True,
-                    "is_featured": index < 6,
-                    "description": raw["short_description"] + " " + NO_INFO,
-                    "specs": [{"label": "Especificações técnicas", "value": NO_INFO}],
-                    "includes": [NO_INFO],
-                    "warranty": NO_INFO,
-                }
-            )
-            await db.products.insert_one(product)
+    # Catálogo real do lojista (PDF "Lista Fornecedores Atualizada").
+    # Substitui de uma única vez os produtos demonstrativos iniciais.
+    meta = await db.settings.find_one({"id": "meta"}) or {}
+    if meta.get("catalog_version") != catalog_data.CATALOG_VERSION:
+        await db.products.delete_many({"source": {"$in": [None, "demo_seed", "manual"]}, "sku": {"$regex": "^BT-1"}})
+        for raw in catalog_data.catalog_items():
+            slug = slugify_pt(raw["name"])
+            if await db.products.find_one({"slug": slug}):
+                continue
+            await db.products.insert_one(normalize_product({**raw, "slug": slug}))
+        await db.settings.update_one(
+            {"id": "meta"}, {"$set": {"id": "meta", "catalog_version": catalog_data.CATALOG_VERSION}}, upsert=True
+        )
 
     if await db.banners.count_documents({}) == 0:
         await db.banners.insert_one(
